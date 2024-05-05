@@ -1,52 +1,65 @@
 --Weekly price moving average for Listed Stocks
+USE NSEBhavcopy
+GO
 
-
-use NSEBhavcopy
-go
-
-
-with weekly_closing AS (
-select DISTINCT stock, 
---[date],
-datepart(year,[date]) as current_year, 
-datepart(WEEK,[date]) as current_week_of_year,
-first_value([open]) over (partition by datepart(year,[date]),  datepart(WEEK,[date]) order by datepart(weekday,[date])) as week_open,
-max(high) over (partition by datepart(year,[date]), datepart(WEEK,[date]) ) as week_high,
-min(low) over (partition by datepart(year,[date]), datepart(WEEK,[date]) ) as week_low,
-first_value([close]) over (partition by datepart(year,[date]),  datepart(WEEK,[date]) order by datepart(weekday,[date]) desc) as week_close
---,[open], [high],[low],[close]
-From stock_ohlc_data where stock in('TITAN')
-group by  
-stock,[date],
-[high],[low],[open],[close]
-/*order by date desc,
-datepart(year,[date]) desc,
-datepart(WEEK,[date]) desc
-*/
-)
-
---select * From test_CTE
-
+WITH weekly_closing_calc
+AS (
+	SELECT DISTINCT stock
+		,
+		--[date],
+		datepart(year, [date]) AS current_year
+		,datepart(WEEK, [date]) AS current_week_of_year
+		,first_value([open]) OVER (
+			PARTITION BY datepart(year, [date])
+			,datepart(WEEK, [date]) ORDER BY datepart(weekday, [date])
+			) AS week_open
+		,max(high) OVER (
+			PARTITION BY datepart(year, [date])
+			,datepart(WEEK, [date])
+			) AS week_high
+		,min(low) OVER (
+			PARTITION BY datepart(year, [date])
+			,datepart(WEEK, [date])
+			) AS week_low
+		,first_value([close]) OVER (
+			PARTITION BY datepart(year, [date])
+			,datepart(WEEK, [date]) ORDER BY datepart(weekday, [date]) DESC
+			) AS week_close
+	--,[open], [high],[low],[close]
+	FROM stock_ohlc_data
+	WHERE stock IN ('TITAN')
+	GROUP BY stock
+		,[date]
+		,[high]
+		,[low]
+		,[open]
+		,[close]
+	)
 
 --Calculating Weeking Closing Average and Weekly Stock Closing Price difference with Moving Average
-select distinct top 1 stock,
-current_year, 
-current_week_of_year,
-week_open, week_high, week_low, week_close,
-round(avg(week_close) over (order by current_year,current_week_of_year ROWS between 29 PRECEDING and current row),2) as weekly_closing_average,
-(week_close - round(avg(week_close) over (order by current_year,current_week_of_year ROWS between 29 PRECEDING and current row),2)) / 
-round(avg(week_close) over (order by current_year,current_week_of_year ROWS between 29 PRECEDING and current row),2) * 100 as PCTDIFF 
-from weekly_closing
-order by current_year desc, current_week_of_year desc
-
-
-
-/*
-select top 30 'temptable',stock, current_year, 
-current_week_of_year, week_open, 
-week_high, week_low, week_close ,
-round(avg(week_close) over (order by current_year,current_week_of_year ROWS between 29 PRECEDING and current row),2) as weekly_closing_average
-From #temp
-order by current_year desc, current_week_of_year desc
-
-*/
+SELECT DISTINCT TOP 1 stock
+	,current_year
+	,current_week_of_year
+	,week_open
+	,week_high
+	,week_low
+	,week_close
+	,round(avg(week_close) OVER (
+			ORDER BY current_year
+				,current_week_of_year ROWS BETWEEN 29 PRECEDING
+					AND CURRENT row
+			), 2) AS [30_week_SMA]
+	,(
+		week_close - round(avg(week_close) OVER (
+				ORDER BY current_year
+					,current_week_of_year ROWS BETWEEN 29 PRECEDING
+						AND CURRENT row
+				), 2)
+		) / round(avg(week_close) OVER (
+			ORDER BY current_year
+				,current_week_of_year ROWS BETWEEN 29 PRECEDING
+					AND CURRENT row
+			), 2) * 100 AS pctdiff
+FROM weekly_closing_calc
+ORDER BY current_year DESC
+	,current_week_of_year DESC
