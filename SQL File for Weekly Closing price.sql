@@ -1,8 +1,10 @@
---Weekly price moving average for Listed Stocks
 USE NSEBhavcopy
 GO
 
-WITH weekly_closing_calc
+
+--Converting Daily historical prices to Weekly prices for Listed Stocks
+
+WITH weekly_price_closing_calc_CTE
 AS (
 	SELECT DISTINCT stock
 		,
@@ -33,9 +35,11 @@ AS (
 		,[open]
 		,[close]
 
-	)
+	),
 
---Calculating Weeking Closing Average and Weekly Stock Closing Price difference with Moving Average
+--Calculating STAN WEINSTEIN Investing method based on Weeking Closing Average and 30 Weekly Simple moving average of Stock and its Closing Price difference with Moving Average
+
+STANWEINSTEIN_3OWEEKSMA_PCT_DIFF AS (
 SELECT stock
 	,current_year
 	,current_week_of_year
@@ -62,7 +66,19 @@ SELECT stock
 				,current_week_of_year ROWS BETWEEN 29 PRECEDING
 					AND CURRENT row
 			), 2) * 100 AS pct_diff
-FROM weekly_closing_calc
-ORDER BY current_year DESC
-	,current_week_of_year DESC
-	,stock asc
+FROM weekly_price_closing_calc_CTE
+)
+
+
+select  stan.stock as 'STOCKNAME', stan.current_year as 'CURRENTYEAR', stan.current_week_of_year as 'CURRENTWEEK_OF_YEAR', 
+stan.week_open 'WEEK_OPEN', stan.week_high as 'WEEK_HIGH', 
+stan.week_low as 'WEEK_LOW', stan.week_close as 'WEEK_CLOSE', 
+stan.[30_week_SMA] as '30_WEEK_SMA', stan.pct_diff as [PCT_DIFF]
+from STANWEINSTEIN_3OWEEKSMA_PCT_DIFF stan
+where 
+stan.week_close >= stan.[30_week_SMA]
+--pct_diff between 0 and 3 and
+and current_year = year(getdate()) 
+and current_week_of_year = datepart(week,getdate()) - 1
+order by stan.current_year desc, stan.current_week_of_year desc
+
