@@ -61,7 +61,7 @@ SELECT stock
 			ORDER BY current_year
 				,current_week_of_year ROWS BETWEEN 29 PRECEDING
 					AND CURRENT row
-			), 2) * 100 AS pctdiff
+			), 2) * 100 AS pct_diff
 FROM weekly_closing_calc
 ORDER BY current_year DESC
 	,current_week_of_year DESC
