@@ -59,7 +59,7 @@ for ind_stock in all_equity_lst['SYMBOL']:
 urls = []
 
 def all_url_lists(stock_list,start_date,end_date):
-    for url in range(0,200):
+    for url in range(0,1000):
         url = "https://query1.finance.yahoo.com/v7/finance/download/{}.NS?period1={}&period2={}&interval=1d&events=history&includeAdjustedClose=true" \
                 .format(stock_list[url],start_date,end_date)
         urls.append(url)
@@ -87,15 +87,15 @@ limits = httpx.Limits(max_connections=MAX)
 async def fetch():
     async with httpx.AsyncClient(timeout = timeout, limits=limits) as client:
         reqs = [client.get(z,headers = headers) for z in urls]
-        time.sleep(1)
+        print("Inside Fetch function")
         resultzz = await asyncio.gather(*reqs, return_exceptions=True)
     
     print(resultzz)
     
     #Creating basedataframe to hold complete data
     base_df = pd.DataFrame()
-'''
-    for p in range(0,300):
+
+    for p in range(0,1000):
         
         content = getattr(resultzz[p], 'content')
         print(content)
@@ -112,7 +112,7 @@ async def fetch():
  
     base_df.to_csv("./sample_csv_processed1.csv")
 
-'''
+
 begin_time = time.perf_counter()
 asyncio.run(fetch())
 end_time = time.perf_counter()
