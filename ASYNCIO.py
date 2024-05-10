@@ -25,7 +25,7 @@ import time
 #Defining Start date and End date to load historical prices for the respective stocks
 
 #Passing date as string
-start = datetime.date(2000, 1, 1)
+start = datetime.date(2000, 1, 3)
 end = datetime.date.today()
 
 print("StartDate:",start)
@@ -98,7 +98,7 @@ async def fetch():
         for p in range(0,len(resultzz)):    
             content = getattr(resultzz[p], 'content')
             print(content)
-            df = pd.read_csv(StringIO(content.decode('utf-8')))
+            df = pd.read_csv(StringIO(content.decode('utf-8')),sep = ',')
             
             #Rephrasing / Adding dataframe by including new column with script name
             df.insert(loc=0,column='Stock',value=stock_list[p + counter])
