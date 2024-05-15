@@ -28,7 +28,7 @@ import time
 start = datetime.date(2000, 1, 3)
 end = datetime.date.today()
 
-print("StartDate:",start)
+print("StartDate:",start)   
 print("End Date:",end)
 #Converting string to unix time format
 start_date = int(time.mktime(start.timetuple()))
@@ -84,37 +84,43 @@ async def fetch():
     
     #Creating basedataframe to hold complete data
     base_df = pd.DataFrame()
-    
-    while(counter < len(urls)):
-        
-        iteration = iteration + 1
-        async with httpx.AsyncClient(timeout = timeout, limits=limits) as client:
-            reqs = [client.get(z,headers = headers) for z in urls[counter : counter + 100]]
-            print("Inside Fetch function-{}".format(iteration))
-            resultzz = await asyncio.gather(*reqs, return_exceptions=True)
-    
-        print(resultzz)
+    success = False
+    while not success: 
+        try:  
+            while(counter < len(urls)):
+                
+                iteration = iteration + 1
+                async with httpx.AsyncClient(timeout = timeout, limits=limits) as client:
+                    reqs = [client.get(z,headers = headers) for z in urls[counter : counter + 50]]
+                    print("Inside Fetch function-{}".format(iteration))
+                    resultzz = await asyncio.gather(*reqs, return_exceptions=True)
             
-        for p in range(0,len(resultzz)):    
-            content = getattr(resultzz[p], 'content')
-            print(content)
-            df = pd.read_csv(StringIO(content.decode('utf-8')),sep = ',')
-            
-            #Rephrasing / Adding dataframe by including new column with script name
-            df.insert(loc=0,column='Stock',value=stock_list[p + counter])
-            
-            #Appending the results to the base Dataframe for consolidated view
-            base_df = base_df._append(df,ignore_index=True)                 
-            print(df)
-            
-            #time.sleep(2)
-            #print(base_df)
-        base_df.to_parquet("./sample_csv_processed1.parquet")
-        
-        counter = counter + 100
-        del[resultzz]
-        print("Final Print",base_df)
-        #time.sleep(30)
+                print(resultzz)
+                    
+                for p in range(0,len(resultzz)):    
+                    content = getattr(resultzz[p], 'content')
+                    print(content)
+                    df = pd.read_csv(StringIO(content.decode('utf-8')),sep = ',')
+                    
+                    #Rephrasing / Adding dataframe by including new column with script name
+                    df.insert(loc=0,column='Stock',value=stock_list[p + counter])
+                    
+                    #Appending the results to the base Dataframe for consolidated view
+                    base_df = base_df._append(df,ignore_index=True)                 
+                    print(df)
+                    
+                    #time.sleep(2)
+                    #print(base_df)
+                base_df.to_parquet("./sample_csv_processed1.parquet")
+                
+                counter = counter + 50
+                del[resultzz]
+                print("Final Print",base_df)
+                time.sleep(10)
+            success = True    
+        except:
+            print("Failed! Retrying...")
+            time.sleep(1)  # wait for 1 second before retrying
         
     #Formating datatypes on Base Dataframe to appropriate format for further SQL data load process
     #Changing Object type to Date format
@@ -168,8 +174,3 @@ print("INSIDE ASYNC function",end_time - begin_time)
 print("StockList Size:",len(stock_list))
 print('<<<<<STOCK_LIST_LENGTH-{}>>>>>>>'.format(stock_list_length),'<<<<<URL LENGTH-{}>>>>>'.format(len(urls)))        
 
-        
-'''
-
-            
-'''
