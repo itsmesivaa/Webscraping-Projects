@@ -25,7 +25,7 @@ import time
 #Defining Start date and End date to load historical prices for the respective stocks
 
 #Passing date as string
-start = datetime.date(2000, 1, 3)
+start = datetime.date(2000, 1,3 )
 end = datetime.date.today()
 
 print("StartDate:",start)   
@@ -58,12 +58,18 @@ stock_list_length = len(stock_list)
 
 urls = []
 
-
 def all_url_lists(stock_list,start_date,end_date):
     for url in range(0,len(stock_list)):
-        url = "https://query1.finance.yahoo.com/v7/finance/download/{}.NS?period1={}&period2={}&interval=1d&events=history&includeAdjustedClose=true" \
-                .format(stock_list[url],start_date,end_date)
-        urls.append(url)
+        if stock_list[url] == '^NSEI':
+            print("InsideIF")
+            url = "https://query1.finance.yahoo.com/v7/finance/download/%5ENSEI?period1={}&period2={}&interval=1d&events=history&includeAdjustedClose=true" \
+                    .format(start_date,end_date)
+            urls.append(url)
+        else:
+            print("InsideELSE")
+            url = "https://query1.finance.yahoo.com/v7/finance/download/{}.NS?period1={}&period2={}&interval=1d&events=history&includeAdjustedClose=true" \
+                    .format(stock_list[url],start_date,end_date)
+            urls.append(url)
     print("Inside URLS",urls, "Length of URLS:", len(urls))
 
 
@@ -137,10 +143,13 @@ async def fetch():
 
     #Changing all column names to lowercase 
     base_df.columns = map(str.lower,base_df.columns)
+    
+    #Replacing ^NSEI to NIFTY_50 for appropriate naming convention 
+    base_df['stock'] = base_df['stock'].str.replace('^NSEI','NIFTY_50')    
 
     #Removing records which has volume as 0 because it holds discrepency data
     base_df.drop(base_df[base_df.volume==0].index,inplace= True)    
-    
+    base_df.drop(base_df[base_df.volume.isnull()].index,inplace= True)
     print("Final Base_df",base_df)
 
     #Inserting stock data into SQL database using sqlachemy
