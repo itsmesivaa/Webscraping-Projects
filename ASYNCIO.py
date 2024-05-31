@@ -25,7 +25,7 @@ import time
 #Defining Start date and End date to load historical prices for the respective stocks
 
 #Passing date as string
-start = datetime.date(2000, 1,3 )
+start = datetime.date(2020, 1,1 )
 end = datetime.date.today()
 
 print("StartDate:",start)   
@@ -45,43 +45,55 @@ print("End Date:",end_date)
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'}
 
     
-#Reading CSV file to fetch all listed NSE Stocks from local folder
-all_equity_lst = pd.read_csv("./NSE_EQUITY_List.csv")
+#Reading excel file to fetch all listed NSE Stocks from local folder
+all_equity_lst = pd.read_excel("./Equity.xlsx",sheet_name="Equity")
+nse_df = pd.read_excel("./Equity.xlsx",sheet_name="NSE_LISTED")
+bse_df = pd.read_excel("./Equity.xlsx",sheet_name="BSE_LISTED")
 
 stock_list = []
+nse_list = []
+bse_list = []
 
 for ind_stock in all_equity_lst['SYMBOL']:
     stock_list.append(ind_stock)
 
-#print("Inside Stock_List:",stock_list)
-stock_list_length = len(stock_list)
+for stock in nse_df['SYMBOL']:
+    nse_list.append(stock)
 
+for stock in bse_df['SYMBOL']:
+    bse_list.append(stock)
+
+stock_list_length = len(stock_list)
+print("Length of StockList:",stock_list_length)
 urls = []
 
 def all_url_lists(stock_list,start_date,end_date):
     for url in range(0,len(stock_list)):
         if stock_list[url] == '^NSEI':
-            print("InsideIF")
             url = "https://query1.finance.yahoo.com/v7/finance/download/%5ENSEI?period1={}&period2={}&interval=1d&events=history&includeAdjustedClose=true" \
                     .format(start_date,end_date)
             urls.append(url)
-        else:
-            print("InsideELSE")
+            
+        elif stock_list[url] in nse_list:
+            # Attempt to format the URL with the stock symbol from the dictionary (.NS)
             url = "https://query1.finance.yahoo.com/v7/finance/download/{}.NS?period1={}&period2={}&interval=1d&events=history&includeAdjustedClose=true" \
-                    .format(stock_list[url],start_date,end_date)
+                .format(stock_list[url],start_date,end_date)
             urls.append(url)
-    print("Inside URLS",urls, "Length of URLS:", len(urls))
-
+            
+        elif stock_list[url] in bse_list:  # Check if url is still empty after the first Else block
+            # Attempt to format the URL with the stock symbol from the dictionary (.BO)
+            url = "https://query1.finance.yahoo.com/v7/finance/download/{}.BO?period1={}&period2={}&interval=1d&events=history&includeAdjustedClose=true" \
+                .format(stock_list[url], start_date, end_date)
+            urls.append(url)
 
 all_url_lists(stock_list,start_date,end_date)
 
-
+print("Inside URLS",urls, "Length of URLS:", len(urls))
 
 MAX = 10000
 
 timeout = httpx.Timeout(None)
 limits = httpx.Limits(max_connections=MAX)
-
 
 async def fetch():
     
@@ -117,7 +129,7 @@ async def fetch():
                     
                     #time.sleep(2)
                     #print(base_df)
-                base_df.to_parquet("./sample_csv_processed1.parquet")
+                base_df.to_parquet("./sample_csv_processed2.parquet")
                 
                 counter = counter + 50
                 del[resultzz]
@@ -165,7 +177,7 @@ async def fetch():
     #DB Actions to load data from Pandas Dataframe to MSSQL
     try:
         base_df
-        base_df.to_sql(table_name, db_conn, if_exists= 'replace',index= False)
+        base_df.to_sql(table_name, db_conn, if_exists= 'append',index= False)
     except Exception as ex:
         print(ex)
     else:
