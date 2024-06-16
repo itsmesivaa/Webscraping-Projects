@@ -21,6 +21,9 @@ headers = {
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 #from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 import time
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -31,22 +34,28 @@ import numpy as np
 def marketsmith_scrape(stock_list,security_codes):
     options = Options()
     options.add_argument('--headless')    
-    
+    PAGE_LOAD_TIMEOUT = 40  # seconds
     for x in tqdm(range(0,len(stock_list))):
         try:
             time.sleep(1)
 
             #Firefox browser webdriver
             driver = webdriver.Firefox(options=options)
-
             #Google chrome webdriver
             #options = webdriver.ChromeOptions()
             #driver = webdriver.Chrome(options=options)
             
+            # Set timeouts
+            driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+
             #Base Url to fetch stock fundamental data through request
             url = "https://marketsmithindia.com/mstool/eval/{}/evaluation.jsp#/".format(stock_list[x])
             print("Firstprint",url)
             driver.get(url)
+            
+            # Wait for the title element to be present with a timeout of 20 seconds
+            WebDriverWait(driver, PAGE_LOAD_TIMEOUT).until(EC.presence_of_element_located((By.TAG_NAME, 'title')))
+            
             #soup = BeautifulSoup(driver.page_source, 'lxml')
             soup = BeautifulSoup(driver.page_source, 'html.parser')
             title_text = str(soup.find('title').text.strip())
@@ -59,9 +68,15 @@ def marketsmith_scrape(stock_list,security_codes):
                 soup.decompose()
                 del(url)
                 driver = webdriver.Firefox(options=options)
+                # Set timeouts
+                driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
                 url = "https://marketsmithindia.com/mstool/eval/{}/evaluation.jsp#/".format(security_codes[x])
                 print("Inside Security Code",url)
                 driver.get(url)
+                
+                # Wait for the title element to be present with a timeout of 20 seconds
+                WebDriverWait(driver, PAGE_LOAD_TIMEOUT).until(EC.presence_of_element_located((By.TAG_NAME, 'title')))
+                
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
                 title_text_bse = str(soup.find('title').text.strip())
                 print("SOUP TITLE TEXT:",title_text_bse)
@@ -116,11 +131,13 @@ def marketsmith_scrape(stock_list,security_codes):
             if x==0:
                 #share_summary = pd.DataFrame(columns= cols,data = [summary_data_values])
                 
-                all_share_summary = pd.DataFrame(columns= [share_summary])
+                all_share_summary = pd.DataFrame(columns= share_summary.columns)
             print ("Inside x loop",x)
                 
             #Adding individual stock data values through every iteration    
+            print("----ABBASS----Before")
             print("Final Datatypes","<<<<<<<<->>>>>>>>",all_share_summary.dtypes)
+            print("----ABBASS----After")
             all_share_summary = all_share_summary._append(share_summary,ignore_index=True)
             
             #del(stock_detail_header,stock_detail_value,share_summary)
@@ -200,7 +217,7 @@ def marketsmith_scrape(stock_list,security_codes):
             
             
             #Quarterly earnings header objects-- START
-                
+                            
             stock_detail_quarterly_headers = soup.find('table', class_ = "table table-condensed tableDetails", id = "formattedSalesAndEarningTable")
             #Filtering table header content from soup objects - stock_detail_quarterly_headers
             quarterly_objects = stock_detail_quarterly_headers.find_all('th')
@@ -275,7 +292,7 @@ def marketsmith_scrape(stock_list,security_codes):
 
 
     #Data cleaning - Dropping unncessary columns
-    all_share_summary.drop(list(all_share_summary)[0:23], axis=1,inplace = True)
+    #all_share_summary.drop(list(all_share_summary)[0:23], axis=1,inplace = True)
     
     #Renaming column name for SQL table processing
     
@@ -318,8 +335,9 @@ def marketsmith_scrape(stock_list,security_codes):
 
     print("Final EPS DF columns","##########",quarterly_earnings_all_stocks.columns)
     print("Final EPS Dataframe","##########",quarterly_earnings_all_stocks)
-        
+    
     #Removing INR string (text cleansing) from few columns to fit into perfect standard for data manipulation
+    
     all_share_summary.market_capitalization = all_share_summary.market_capitalization.str.replace('INR ','')
     all_share_summary.sales = all_share_summary.sales.str.replace('INR ','')
     all_share_summary.group_rank_out_of_197 = all_share_summary.group_rank_out_of_197.str.replace(' of 197','')
@@ -341,27 +359,31 @@ def marketsmith_scrape(stock_list,security_codes):
 
 #Reading CSV file to fetch all listed Stocks from NSE website
 
-all_equity_lst = pd.read_excel("./Equity - Copy.xlsx")
+all_equity_lst = pd.read_excel("./Equity.xlsx", sheet_name='Equity_detail', dtype=str)
 
 stock_list = []
 
 # Create a list of symbols and security codes
 stock_list = all_equity_lst['SYMBOL'].tolist()
 security_codes = all_equity_lst['Security_Code'].tolist()
+del stock_list[0]
+del security_codes[0]
+
 #for ind_stock in all_equity_lst['SYMBOL']:
     #stock_list.append(ind_stock)
 
 print("Inside Stock_List:",stock_list,security_codes)
-
+'''
 sql_engine = create_engine('mssql+pyodbc://' + "DESKTOP-EQ55Q8H" + '/' + "NSEBhavcopy" + '?trusted_connection=yes&driver=SQL+Server')
 table_trun_conn = sql_engine.connect()
 sql_engine.execute("DROP TABLE IF EXISTS market_smith_stock_eval_test")
 sql_engine.execute("DROP TABLE IF EXISTS all_stocks_quarterly_earnings_test")
 sql_engine.execute("DROP TABLE IF EXISTS market_smith_stock_institutional_data_test")
 table_trun_conn.close()
+'''
 
 #Calling the function to download the data
-all_share_summary,quarterly_earnings_all_stocks,all_stocks_institutional_ownership_pivoted = marketsmith_scrape(stock_list,security_codes)
+all_share_summary,quarterly_earnings_all_stocks,all_stocks_institutional_ownership_pivoted = marketsmith_scrape(stock_list[0:50],security_codes)
 
 #Inserting into Parquet
 all_share_summary.to_parquet("./market_smith_stock_eval_test.parquet")
@@ -379,19 +401,28 @@ del_dup_institutional_data = "DELETE DUP FROM (SELECT ROW_NUMBER() OVER (PARTITI
                     FROM market_smith_stock_institutional_data_test) DUP WHERE DUP.Val > 1"
 
 sql_engine = create_engine('mssql+pyodbc://' + "DESKTOP-EQ55Q8H" + '/' + "NSEBhavcopy" + '?trusted_connection=yes&driver=SQL+Server')
+'''
+server = 'nsefinancialdata.c9micsosyodk.eu-west-1.rds.amazonaws.com'
+database = 'NSEBhavcopy'
+username = 'itsmesivaa'
+password = 'Kabali-2024'
+#driver = 'ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes'
+driver = 'SQL+Server'
+
+connection_string = f"mssql+pyodbc://{username}:{password}@{server}/{database}?driver={driver}"
+
+sql_engine = create_engine(connection_string,echo = True)
+'''
 db_conn= sql_engine.connect()
 
 stock_eval_table_name = "market_smith_stock_eval_test"
 all_stocks_quarterly_earnings = "all_stocks_quarterly_earnings_test"
 stock_institutional_ownership_data = "market_smith_stock_institutional_data_test"
 
-t1 = pd.read_parquet("./market_smith_stock_eval_test.parquet")
-t2 = pd.read_parquet("./all_stocks_quarterly_earnings_test.parquet")
-t3 = pd.read_parquet("./market_smith_stock_instituional_data_test.parquet")
 
-t1.to_sql(stock_eval_table_name, db_conn, if_exists= 'append',index= False)
-t2.to_sql(all_stocks_quarterly_earnings, db_conn, if_exists= 'append',index= False)
-t3.to_sql(stock_institutional_ownership_data,db_conn, if_exists= 'append',index = False)
+all_share_summary.to_sql(stock_eval_table_name, db_conn, if_exists= 'replace',index= False, method='multi', chunksize=100)
+quarterly_earnings_all_stocks.to_sql(all_stocks_quarterly_earnings, db_conn, if_exists= 'replace',index= False, method='multi', chunksize=100)
+all_stocks_institutional_ownership_pivoted.to_sql(stock_institutional_ownership_data,db_conn, if_exists= 'replace',index = False, method='multi', chunksize=100)
 
 
 sql_engine.execute(del_dup_stock_eval)
